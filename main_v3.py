@@ -1,5 +1,10 @@
 '''
-Simple cam program
+VIDEO MAGIC V3
+
+This version is using vectorized operations on numpy arrays.
+This is much faster and the results are nice.
+However color would be nice to enjoy the beach.
+
 '''
 
 import cv2

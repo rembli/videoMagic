@@ -1,5 +1,9 @@
 '''
-Simple cam program
+VIDEO MAGIC V1
+
+This version is a first working version.
+But it looks that I am not really on the beach but somehow caucht in twilight zone.
+
 '''
 
 import cv2
@@ -15,7 +19,7 @@ def main():
         background_image_cam = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         cv2.imshow('video', background_image_cam)
 
-        if cv2.waitKey(1) == ord('q'):
+        if cv2.waitKey(1) == ord (' '): # SPACE
             break
 
     height, width = background_image_cam.shape
@@ -41,7 +45,7 @@ def main():
 
         cv2.imshow('video',image_add_inverted)
 
-        if cv2.waitKey(1) == ord('q'):
+        if cv2.waitKey(1) == 27: # ESC:
             break
 
     cap.release()

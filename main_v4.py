@@ -1,13 +1,17 @@
 '''
-VIDEO MAGIC V2
+VIDEO MAGIC V4
 
-This version is a first working version using our own calculations beyound the image operations provided by CV2.
-It is relatively slow.
+This version changed from black and white to color.
+The change is relativelly simple as we were using vectorized operations.
+There are some strange color effects that I cannot explain right now.
 
 '''
 
 import cv2
 import numpy as np
+
+BACKGROUND_IMAGE = "VideoMagic/beach.jpg"
+#BACKGROUND_IMAGE = "VideoMagic/space.jpg"
 
 THRESHOLD = 25
 BLUR_FACTOR = 40
@@ -38,25 +42,24 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
     # capture background from cam
     while True:
         # capture from cam 
-        _, image = cap.read()
-        background_image_cam = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, background_image_cam = cap.read()
         
         # place text on image
         txt = "GET OUT OF THE SCREEN TO CAPTURE THE BACKGROUND THEN PRESS 'SPACE'"
-        cv2.putText(image, txt, (5, 25), FONT, FONT_SCALE, FONT_COLOR)
+        cv2.putText(background_image_cam, txt, (5, 25), FONT, FONT_SCALE, FONT_COLOR)
 
         # display cam image
-        cv2.imshow('video', image)
+        cv2.imshow('video', background_image_cam)
 
         # wait for user input
         if cv2.waitKey(1) == ord(' '):
             break
 
-    height, width = background_image_cam.shape
+    height, width, _ = background_image_cam.shape
 
     # load new background image and prepare it (esp. scale size)
-    background_image_new = cv2.imread('VideoMagic/beach.jpg', cv2.IMREAD_GRAYSCALE)
-    b_height, b_width = background_image_new.shape
+    background_image_new = cv2.imread(BACKGROUND_IMAGE)
+    b_height, b_width, _ = background_image_new.shape
 
     scale = width/b_width
     padding = int((height - (b_height*scale))/2)
@@ -71,18 +74,13 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
         # IMAGE MAGIC
         #####################################################################################
                 
-        _, image = cap.read()
-        cam_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, cam_image = cap.read()
 
         # calcuate the image_mask = difference between the current cam image and the captured background image of the cam
-        image_mask_noisy = np.empty([height, width])
-        for y in range(height): 
-            for x in range(width):
-                pix = abs((int)(background_image_cam[y, x])-(int)(cam_image[y, x]))
-                if pix <= treshold:
-                    image_mask_noisy[y,x] = True
-                else:
-                    image_mask_noisy[y,x] = False
+        f = lambda pix: 1.0 if pix <= treshold else 0.0
+        vectorized_f = np.vectorize(f)
+        image_diff = abs(cv2.subtract(background_image_cam, cam_image))
+        image_mask_noisy = vectorized_f(image_diff)
 
         # blur the image mask to reduce noise
         if blur_factor > 0:
@@ -91,23 +89,12 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
             image_mask_blurred = image_mask_noisy
 
         # generate sharper mask from blurred mask
-        image_mask = np.empty([height, width])
-        for y in range(height):
-            for x in range(width):
-                pix = image_mask_blurred[y,x]
-                if pix > sharp_factor:
-                    image_mask[y,x] = True
-                else:
-                    image_mask[y,x] = False
+        f = lambda pix: 1.0 if pix > sharp_factor else 0.0
+        vectorized_f = np.vectorize(f)
+        image_mask = vectorized_f(image_mask_blurred)
 
-        # print cam image on top of background according mask
-        image_calculated = np.array(background_image_new)
-
-        for y in range(height):
-            for x in range(width):
-                pix = image_mask[y, x]
-                if not pix:
-                    image_calculated[y, x] = cam_image[y, x]
+        # print cam image on top of background according mask       
+        image_calculated = cv2.copyTo(background_image_new, image_mask.astype(cam_image.dtype), np.array(cam_image))
 
         #####################################################################################
         # DISPLAY MODE
@@ -126,22 +113,21 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
 
         # convert binary masks to float values
         if display_mode == SHOW_MASK or display_mode == SHOW_MASK_BLURRED or display_mode == SHOW_MASK_NOISY:
-            image_calculated = np.float32(image_calculated)
-        # convert image to color
-        vis = cv2.cvtColor(image_calculated, cv2.COLOR_GRAY2BGR)
+            image_mask_canvas = np.ones([height, width, 3])*255
+            cv2.copyTo(image_mask_canvas, image_mask.astype(cam_image.dtype), image_calculated)
 
         # place text on image
         txt = "THRESHOLD "+str(treshold)
-        cv2.putText(vis, txt, (5, 25), FONT, FONT_SCALE, FONT_COLOR)
+        cv2.putText(image_calculated, txt, (5, 25), FONT, FONT_SCALE, FONT_COLOR)
 
         txt = "BLUR FACTOR "+str(blur_factor)
-        cv2.putText(vis, txt, (5, 45), FONT, FONT_SCALE, FONT_COLOR)
+        cv2.putText(image_calculated, txt, (5, 45), FONT, FONT_SCALE, FONT_COLOR)
 
         txt = "SHARPNESS "+str(sharp_factor)
-        cv2.putText(vis, txt, (5, 65), FONT, FONT_SCALE, FONT_COLOR)
+        cv2.putText(image_calculated, txt, (5, 65), FONT, FONT_SCALE, FONT_COLOR)
 
         # display modified image
-        cv2.imshow('video', vis)
+        cv2.imshow('video', image_calculated)
 
         #####################################################################################
         # COMMANDS
