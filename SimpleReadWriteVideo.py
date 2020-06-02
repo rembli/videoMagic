@@ -4,7 +4,7 @@ def main():
 
     cap = cv2.VideoCapture(0)
 
-    # fourcc = four character codec; fow Windows only the combination MJPG and .avi-file worked
+    # fourcc = four character codec
     fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
     
     # Write to file - Important:
