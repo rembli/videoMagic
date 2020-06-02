@@ -1,7 +1,3 @@
-# https://answers.opencv.org/question/202017/how-to-use-gstreamer-pipeline-in-opencv/
-# https://stackoverflow.com/questions/45544877/write-in-gstreamer-pipeline-from-opencv-in-python
-# https://www.pyimagesearch.com/2016/02/22/writing-to-video-with-opencv/
-
 import cv2
 
 def main():
