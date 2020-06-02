@@ -1,8 +1,8 @@
 '''
-VIDEO MAGIC V5
+VIDEO MAGIC V6
 
-This version is using Delta E to calculate the difference between the background and the background with actor.
-Quality improved a lot! Now it is getting awesaome .. I already feel the beach
+This version is using a dynamic background from another video stream.
+Spacy!
 
 '''
 
@@ -10,8 +10,7 @@ import cv2
 import numpy as np
 import colour
 
-BACKGROUND_IMAGE = "VideoMagic/beach.jpg"
-#BACKGROUND_IMAGE = "VideoMagic/space.jpg"
+BACKGROUND_VIDEO = "VideoMagic/space.mp4"
 
 THRESHOLD = 25
 BLUR_FACTOR = 40
@@ -31,14 +30,24 @@ FONT_COLOR_BW = (0, 0, 0)
 FONT_THICKNESS = 2
 
 def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR, sharp_factor=SHARP_FACTOR):
-    ''' main
-    '''
-    cap = cv2.VideoCapture(0)
 
+    cap = cv2.VideoCapture(0)
+    cap_background = cv2.VideoCapture(BACKGROUND_VIDEO)
 
     #####################################################################################
     # PREPARATION
     #####################################################################################
+
+    # function to load next background image from video stream and prepare it (esp. scale size)
+    def get_next_background_image(cap_background, width, height):
+        _, background_image_new = cap_background.read()
+        b_height, b_width, _ = background_image_new.shape
+
+        scale_width = width/b_width
+        padding = int((height - (b_height*scale_width))/2)
+        background_image_new = cv2.resize(background_image_new, (width, int(b_height*scale_width)))
+        background_image_new = cv2.copyMakeBorder(background_image_new, padding, padding, 0, 0, borderType=cv2.BORDER_CONSTANT, value=0)
+        return background_image_new
 
     # capture background from cam
     while True:
@@ -59,30 +68,21 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
 
     height, width, _ = background_image_cam.shape
 
-    # load new background image and prepare it (esp. scale size)
-    background_image_new = cv2.imread(BACKGROUND_IMAGE)
-    b_height, b_width, _ = background_image_new.shape
-
-    scale = width/b_width
-    padding = int((height - (b_height*scale))/2)
-    background_image_new = cv2.resize(background_image_new, (width, int(b_height*scale)))
-    background_image_new = cv2.copyMakeBorder(background_image_new, padding+1, padding+1, 0, 0, borderType=cv2.BORDER_CONSTANT, value=0)
-
-    # capture video and replace old background with new background
+    #####################################################################################
+    # IMAGE MAGIC
+    #####################################################################################
 
     while True:
-
-        #####################################################################################
-        # IMAGE MAGIC
-        #####################################################################################
-                
         _, cam_image = cap.read()
 
-        # calcuate the image_mask = difference between the current cam image and the captured background image of the cam based on Delta-E Color Difference
-        # https://www.colour-science.org/
+        # calcuate the image_mask = difference between the current cam image and the captured background image of the cam
+        # Delta-E Color Difference delivers the best quality
+        # BUT this is the MOST EXPENSIVE OPERATION
+        image_diff = abs(colour.delta_E(background_image_cam, cam_image))
+
+        # thresholding the difference between the two images
         f = lambda pix: 1.0 if pix <= treshold else 0.0
         vectorized_f = np.vectorize(f)
-        image_diff = abs(colour.delta_E(background_image_cam, cam_image))
         image_mask_noisy = vectorized_f(image_diff)        
 
         # blur the image mask to reduce noise
@@ -101,20 +101,16 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
         #####################################################################################
 
         if display_mode == SHOW_CAM:
-            vis = np.array(cam_image)
-        elif display_mode == SHOW_BACKGROUND:
-            vis = np.array(background_image_new)
+            vis = cam_image
         elif display_mode == SHOW_MASK:
-            vis = np.array(image_mask)
+            vis = image_mask
         elif display_mode == SHOW_MASK_NOISY:
-            vis = np.array(image_mask_noisy)
+            vis = image_mask_noisy
         elif display_mode == SHOW_MASK_BLURRED:
-            vis = np.array(image_mask_blurred)
+            vis = image_mask_blurred
         else:
-            vis = cv2.copyTo(background_image_new, image_mask.astype(cam_image.dtype), np.array(cam_image))
-
-        # a little bluring magic dust ;-)
-        vis = cv2.blur(vis, (2, 2))
+            background_image_new = get_next_background_image(cap_background, width, height)
+            vis = cv2.copyTo(background_image_new, image_mask.astype(cam_image.dtype), cam_image)
 
         # place text on image
         font_color = FONT_COLOR
@@ -153,9 +149,9 @@ def main(display_mode = SHOW_MIXED, treshold=THRESHOLD, blur_factor=BLUR_FACTOR,
         elif k == ord('n') and blur_factor >= 5:
             blur_factor = blur_factor - 5
 
-        elif k == ord('s') and sharp_factor <= 0.9:
+        elif k == ord('d') and sharp_factor <= 0.9:
             sharp_factor = sharp_factor + 0.1
-        elif k == ord('d') and sharp_factor >= 0.1:
+        elif k == ord('s') and sharp_factor >= 0.1:
             sharp_factor = sharp_factor - 0.1
 
         elif k == ord(" "):
